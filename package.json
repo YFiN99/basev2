@@ -63,7 +63,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dotenv": "^16.4.7",
-    "inquirer": "^12.4.3",
+    "inquirer": "^13.3.0",
     "next": "^16.1.6",
     "next-auth": "^4.24.13",
     "postcss": "^8.5.8",
