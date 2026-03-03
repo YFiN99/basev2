@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 import type { Session } from 'next-auth';
 import { SessionProvider } from 'next-auth/react';
-import { AuthKitProvider, AuthKitConfig } from '@farcaster/auth-kit'; // Tambahkan AuthKitConfig
+import { AuthKitProvider } from '@farcaster/auth-kit'; // Hapus AuthKitConfig dari sini
 import { MiniAppProvider } from '@neynar/react';
 import { ANALYTICS_ENABLED, RETURN_URL } from '~/lib/constants';
 
@@ -12,10 +12,10 @@ const WagmiProvider = dynamic(
   { ssr: false }
 );
 
-// Gunakan tipe AuthKitConfig agar TypeScript memvalidasi propertinya
-const farcasterConfig: AuthKitConfig = {
+// Gunakan 'any' karena library tidak mengekspor tipe config secara publik
+const farcasterConfig: any = {
   rpcUrl: 'https://mainnet.optimism.io',
-  domain: 'localhost:3000', // Pastikan ganti ke domain asli saat sudah deploy
+  domain: 'localhost:3000', 
   siweUri: 'http://localhost:3000/api/auth/siwe',
 };
 
