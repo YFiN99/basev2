@@ -1,0 +1,287 @@
+"use client";
+
+import { useState } from "react";
+import { useAccount, useConnect } from "wagmi";
+import { useAddLiquidity, useRemoveLiquidity, usePoolInfo, useLPBalance } from "~/hooks/useLiquidity";
+import { useTokenBalance } from "~/hooks/useTokenBalance";
+import { BASE_TOKENS, Token } from "~/lib/constants";
+
+function TokenButton({ token, onClick }: { token: Token | null; onClick: () => void }) {
+  return (
+    <button onClick={onClick} style={{
+      display: "flex", alignItems: "center", gap: "8px",
+      background: "#fff", borderRadius: "20px", padding: "8px 12px 8px 8px",
+      boxShadow: "0 2px 8px rgba(0,0,0,0.12)", cursor: "pointer", border: "none",
+    }}>
+      {token && (
+        <div style={{
+          width: "24px", height: "24px", borderRadius: "50%",
+          background: token.logoColor, display: "flex", alignItems: "center",
+          justifyContent: "center", fontSize: "11px", color: "#fff", fontWeight: 700,
+        }}>{token.logoText}</div>
+      )}
+      <span style={{ fontWeight: 700, fontSize: "15px" }}>{token?.symbol ?? "Select"}</span>
+      <span style={{ color: "#888", fontSize: "12px" }}>▼</span>
+    </button>
+  );
+}
+
+// ✅ Token modal generik, bisa exclude token tertentu
+function TokenModal({ onSelect, onClose, exclude }: {
+  onSelect: (t: Token) => void;
+  onClose: () => void;
+  exclude?: Token | null;
+}) {
+  const [search, setSearch] = useState("");
+  const filtered = BASE_TOKENS.filter(t =>
+    t.symbol !== exclude?.symbol &&
+    (t.symbol.toLowerCase().includes(search.toLowerCase()) ||
+      t.name.toLowerCase().includes(search.toLowerCase()))
+  );
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+      onClick={onClose}>
+      <div style={{ background: "#fff", borderRadius: "24px 24px 0 0", width: "100%", maxWidth: "480px", padding: "20px", maxHeight: "70vh", overflowY: "auto" }}
+        onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+          <span style={{ fontSize: "16px", fontWeight: 700 }}>Select Token</span>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer", color: "#888" }}>X</button>
+        </div>
+        <input
+          placeholder="Search token..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ width: "100%", padding: "10px 14px", borderRadius: "14px", border: "1px solid #E8ECEF", fontSize: "14px", outline: "none", marginBottom: "12px", boxSizing: "border-box" }}
+        />
+        {filtered.map((t) => (
+          <div key={t.symbol} onClick={() => onSelect(t)}
+            style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 8px", cursor: "pointer", borderRadius: "12px" }}
+            onMouseOver={(e) => (e.currentTarget.style.background = "#F7F8FA")}
+            onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}>
+            <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: t.logoColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", color: "#fff", fontWeight: 700 }}>{t.logoText}</div>
+            <div>
+              <div style={{ fontWeight: 600 }}>{t.symbol}</div>
+              <div style={{ fontSize: "12px", color: "#888" }}>{t.name}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function LiquidityWidget() {
+  const [mode, setMode] = useState<"add" | "remove">("add");
+
+  // ✅ Dua token bisa dipilih bebas
+  const [tokenA, setTokenA] = useState<Token>(BASE_TOKENS[0]); // ETH default
+  const [tokenB, setTokenB] = useState<Token>(BASE_TOKENS[1]); // USDC default
+
+  const [amountA, setAmountA] = useState("");
+  const [amountB, setAmountB] = useState("");
+  const [lpAmount, setLpAmount] = useState("");
+
+  const [showModalA, setShowModalA] = useState(false);
+  const [showModalB, setShowModalB] = useState(false);
+
+  const { address, isConnected } = useAccount();
+  const { connect, connectors } = useConnect();
+
+  const { addLiquidity, isPending: isAdding, isConfirming: isAddConfirming, isSuccess: isAddSuccess, txHash: addTx, error: addError, reset: resetAdd } = useAddLiquidity();
+  const { removeLiquidity, isPending: isRemoving, isConfirming: isRemoveConfirming, isSuccess: isRemoveSuccess, txHash: removeTx, error: removeError, reset: resetRemove } = useRemoveLiquidity();
+
+  const { reserve0, reserve1, isValidPair, pairAddress } = usePoolInfo(tokenA, tokenB);
+  const { lpFormatted, lpBalance } = useLPBalance(pairAddress, address);
+
+  const { formatted: balanceA } = useTokenBalance(tokenA, address);
+  const { formatted: balanceB } = useTokenBalance(tokenB, address);
+
+  const handleAdd = async () => {
+    if (!address) return;
+    try {
+      resetAdd();
+      // Tentukan mana yang ETH (native) untuk addLiquidity
+      if (tokenA.isNative) {
+        await addLiquidity(address, tokenB, amountB, amountA);
+      } else if (tokenB.isNative) {
+        await addLiquidity(address, tokenA, amountA, amountB);
+      } else {
+        // Token vs Token — sesuaikan dengan useLiquidity kamu
+        await addLiquidity(address, tokenB, amountB, amountA);
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const handleRemove = async () => {
+    if (!address || !lpBalance) return;
+    try {
+      resetRemove();
+      const minA = (Number(reserve0) * 0.995).toFixed(tokenA.decimals > 6 ? 6 : tokenA.decimals);
+      const minB = (Number(reserve1) * 0.995).toFixed(tokenB.decimals > 6 ? 6 : tokenB.decimals);
+      await removeLiquidity(address, tokenB, lpBalance, minB, minA);
+    } catch (e) { console.error(e); }
+  };
+
+  if (!isConnected) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "60vh", gap: "12px" }}>
+        <span style={{ fontSize: "48px" }}>🏊</span>
+        <p style={{ fontWeight: 600, color: "#000" }}>Connect wallet to manage liquidity</p>
+        <button onClick={() => connect({ connector: connectors[0] })} style={{ padding: "12px 24px", borderRadius: "16px", background: "#FF007A", color: "#fff", border: "none", cursor: "pointer", fontWeight: 600, fontSize: "15px" }}>
+          Connect Wallet
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#F7F8FA", padding: "20px 16px 100px", fontFamily: "'Inter', sans-serif", maxWidth: "480px", margin: "0 auto" }}>
+
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
+        <h2 style={{ fontSize: "20px", fontWeight: 700, margin: 0 }}>
+          {mode === "add" ? "Add Liquidity" : "Remove Liquidity"}
+        </h2>
+        <div style={{ display: "flex", gap: "8px" }}>
+          {(["add", "remove"] as const).map((m) => (
+            <button key={m} onClick={() => setMode(m)} style={{
+              padding: "6px 14px", borderRadius: "12px", fontSize: "13px", fontWeight: 600,
+              border: "none", cursor: "pointer",
+              background: mode === m ? "#FF007A" : "#E8ECEF",
+              color: mode === m ? "#fff" : "#888",
+            }}>{m === "add" ? "Add" : "Remove"}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Pool info */}
+      {isValidPair && (
+        <div style={{ background: "#fff", borderRadius: "16px", padding: "14px 16px", marginBottom: "12px", border: "1px solid #E8ECEF" }}>
+          <div style={{ fontSize: "12px", color: "#888", marginBottom: "8px", fontWeight: 600 }}>POOL INFO</div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+            <span style={{ fontSize: "13px", color: "#888" }}>{tokenA.symbol} Reserve</span>
+            <span style={{ fontSize: "13px", fontWeight: 600 }}>{Number(reserve0).toFixed(4)} {tokenA.symbol}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+            <span style={{ fontSize: "13px", color: "#888" }}>{tokenB.symbol} Reserve</span>
+            <span style={{ fontSize: "13px", fontWeight: 600 }}>{Number(reserve1).toFixed(4)} {tokenB.symbol}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <span style={{ fontSize: "13px", color: "#888" }}>Your LP tokens</span>
+            <span style={{ fontSize: "13px", fontWeight: 600, color: "#FF007A" }}>{lpFormatted}</span>
+          </div>
+        </div>
+      )}
+
+      {mode === "add" ? (
+        <div style={{ background: "#fff", borderRadius: "24px", padding: "4px", boxShadow: "0 4px 24px rgba(0,0,0,0.08)", border: "1px solid #E8ECEF" }}>
+
+          {/* Token A */}
+          <div style={{ background: "#F7F8FA", borderRadius: "20px", padding: "16px", marginBottom: "4px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+              <span style={{ fontSize: "13px", color: "#888" }}>{tokenA.symbol} Amount</span>
+              <span style={{ fontSize: "12px", color: "#888" }}>
+                Balance: <span style={{ color: "#000", fontWeight: 500, cursor: "pointer", textDecoration: "underline" }}
+                  onClick={() => setAmountA(balanceA)}>{balanceA}</span>
+              </span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <input type="number" value={amountA} placeholder="0.0" onChange={(e) => setAmountA(e.target.value)}
+                style={{ background: "none", border: "none", outline: "none", fontSize: "32px", fontWeight: 500, width: "55%", color: amountA ? "#000" : "#C3C5CB" }} />
+              {/* ✅ Token A bisa diganti */}
+              <TokenButton token={tokenA} onClick={() => setShowModalA(true)} />
+            </div>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "center", margin: "-2px 0" }}>
+            <div style={{ width: "32px", height: "32px", borderRadius: "10px", background: "#fff", border: "4px solid #F7F8FA", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px" }}>+</div>
+          </div>
+
+          {/* Token B */}
+          <div style={{ background: "#F7F8FA", borderRadius: "20px", padding: "16px", marginTop: "4px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+              <span style={{ fontSize: "13px", color: "#888" }}>{tokenB.symbol} Amount</span>
+              <span style={{ fontSize: "12px", color: "#888" }}>
+                Balance: <span style={{ color: "#000", fontWeight: 500, cursor: "pointer", textDecoration: "underline" }}
+                  onClick={() => setAmountB(balanceB)}>{balanceB}</span>
+              </span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <input type="number" value={amountB} placeholder="0.0" onChange={(e) => setAmountB(e.target.value)}
+                style={{ background: "none", border: "none", outline: "none", fontSize: "32px", fontWeight: 500, width: "55%", color: amountB ? "#000" : "#C3C5CB" }} />
+              <TokenButton token={tokenB} onClick={() => setShowModalB(true)} />
+            </div>
+          </div>
+
+          <div style={{ padding: "4px" }}>
+            <button onClick={handleAdd} disabled={isAdding || isAddConfirming || !amountA || !amountB}
+              style={{
+                width: "100%", padding: "16px", borderRadius: "20px",
+                background: isAdding || isAddConfirming ? "#F7F8FA" : "#FF007A",
+                border: "none", cursor: isAdding || isAddConfirming ? "not-allowed" : "pointer",
+                fontSize: "18px", fontWeight: 600,
+                color: isAdding || isAddConfirming ? "#C3C5CB" : "#fff",
+              }}>
+              {isAdding ? "⏳ Confirm..." : isAddConfirming ? "⛓️ Processing..." : "Supply"}
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* REMOVE */
+        <div style={{ background: "#fff", borderRadius: "24px", padding: "16px", boxShadow: "0 4px 24px rgba(0,0,0,0.08)", border: "1px solid #E8ECEF" }}>
+          <div style={{ fontSize: "13px", color: "#888", marginBottom: "8px" }}>Your LP Balance</div>
+          <div style={{ fontSize: "28px", fontWeight: 700, marginBottom: "16px", color: "#FF007A" }}>{lpFormatted} LP</div>
+          <div style={{ fontSize: "13px", color: "#888", marginBottom: "8px" }}>Token pair</div>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "20px" }}>
+            <TokenButton token={tokenA} onClick={() => setShowModalA(true)} />
+            <span style={{ color: "#888", fontWeight: 700 }}>+</span>
+            <TokenButton token={tokenB} onClick={() => setShowModalB(true)} />
+          </div>
+          <button onClick={handleRemove} disabled={isRemoving || isRemoveConfirming || !lpBalance || lpBalance === 0n}
+            style={{
+              width: "100%", padding: "16px", borderRadius: "20px",
+              background: isRemoving || isRemoveConfirming || !lpBalance ? "#F7F8FA" : "#FF007A",
+              border: "none", cursor: "pointer", fontSize: "18px", fontWeight: 600,
+              color: isRemoving || isRemoveConfirming || !lpBalance ? "#C3C5CB" : "#fff",
+            }}>
+            {isRemoving ? "⏳ Confirm..." : isRemoveConfirming ? "⛓️ Processing..." : "Remove Liquidity"}
+          </button>
+        </div>
+      )}
+
+      {/* Success */}
+      {(isAddSuccess || isRemoveSuccess) && (
+        <div style={{ background: "#E8F5E9", borderRadius: "16px", padding: "16px", marginTop: "8px", border: "1px solid #81C784", textAlign: "center" }}>
+          <div style={{ fontSize: "15px", fontWeight: 600, color: "#2E7D32", marginBottom: "6px" }}>✅ Transaction Successful!</div>
+          <a href={`https://basescan.org/tx/${addTx || removeTx}`} target="_blank" rel="noreferrer" style={{ fontSize: "13px", color: "#1976D2" }}>View on BaseScan ↗</a>
+        </div>
+      )}
+
+      {/* Error */}
+      {(addError || removeError) && (
+        <div style={{ background: "#FFEBEE", borderRadius: "16px", padding: "16px", marginTop: "8px", border: "1px solid #EF9A9A" }}>
+          <div style={{ fontSize: "13px", fontWeight: 600, color: "#C62828" }}>❌ Failed</div>
+          <div style={{ fontSize: "12px", color: "#B71C1C" }}>{(addError || removeError)?.message.slice(0, 120)}</div>
+        </div>
+      )}
+
+      {/* Modal Token A */}
+      {showModalA && (
+        <TokenModal
+          onSelect={(t) => { setTokenA(t); setShowModalA(false); }}
+          onClose={() => setShowModalA(false)}
+          exclude={tokenB}
+        />
+      )}
+
+      {/* Modal Token B */}
+      {showModalB && (
+        <TokenModal
+          onSelect={(t) => { setTokenB(t); setShowModalB(false); }}
+          onClose={() => setShowModalB(false)}
+          exclude={tokenA}
+        />
+      )}
+    </div>
+  );
+}

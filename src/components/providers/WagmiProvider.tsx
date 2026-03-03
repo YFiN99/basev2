@@ -1,3 +1,5 @@
+"use client";
+
 import { createConfig, http, WagmiProvider } from "wagmi";
 import { base, degen, mainnet, optimism, unichain, celo } from "wagmi/chains";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -8,33 +10,27 @@ import { useEffect, useState } from "react";
 import { useConnect, useAccount } from "wagmi";
 import React from "react";
 
-// Custom hook for Coinbase Wallet detection and auto-connection
 function useCoinbaseWalletAutoConnect() {
   const [isCoinbaseWallet, setIsCoinbaseWallet] = useState(false);
   const { connect, connectors } = useConnect();
   const { isConnected } = useAccount();
 
   useEffect(() => {
-    // Check if we're running in Coinbase Wallet
     const checkCoinbaseWallet = () => {
-      const isInCoinbaseWallet = window.ethereum?.isCoinbaseWallet || 
+      const isInCoinbaseWallet =
+        window.ethereum?.isCoinbaseWallet ||
         window.ethereum?.isCoinbaseWalletExtension ||
         window.ethereum?.isCoinbaseWalletBrowser;
       setIsCoinbaseWallet(!!isInCoinbaseWallet);
     };
-    
     checkCoinbaseWallet();
     window.addEventListener('ethereum#initialized', checkCoinbaseWallet);
-    
-    return () => {
-      window.removeEventListener('ethereum#initialized', checkCoinbaseWallet);
-    };
+    return () => window.removeEventListener('ethereum#initialized', checkCoinbaseWallet);
   }, []);
 
   useEffect(() => {
-    // Auto-connect if in Coinbase Wallet and not already connected
     if (isCoinbaseWallet && !isConnected) {
-      connect({ connector: connectors[1] }); // Coinbase Wallet connector
+      connect({ connector: connectors[1] });
     }
   }, [isCoinbaseWallet, isConnected, connect, connectors]);
 
@@ -44,12 +40,13 @@ function useCoinbaseWalletAutoConnect() {
 export const config = createConfig({
   chains: [base, optimism, mainnet, degen, unichain, celo],
   transports: {
-    [base.id]: http(),
-    [optimism.id]: http(),
-    [mainnet.id]: http(),
+    // ✅ Pakai RPC publik yang reliable untuk Base
+    [base.id]: http('https://mainnet.base.org'),
+    [optimism.id]: http('https://mainnet.optimism.io'),
+    [mainnet.id]: http('https://cloudflare-eth.com'),
     [degen.id]: http(),
     [unichain.id]: http(),
-    [celo.id]: http(),
+    [celo.id]: http('https://forno.celo.org'),
   },
   connectors: [
     farcasterFrame(),
@@ -67,9 +64,16 @@ export const config = createConfig({
   ],
 });
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // ✅ Retry otomatis kalau RPC gagal
+      retry: 3,
+      retryDelay: 1000,
+    },
+  },
+});
 
-// Wrapper component that provides Coinbase Wallet auto-connection
 function CoinbaseWalletAutoConnect({ children }: { children: React.ReactNode }) {
   useCoinbaseWalletAutoConnect();
   return <>{children}</>;
