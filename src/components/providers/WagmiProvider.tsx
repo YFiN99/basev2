@@ -17,19 +17,25 @@ function useCoinbaseWalletAutoConnect() {
 
   useEffect(() => {
     const checkCoinbaseWallet = () => {
+      // ✅ Type casting ke 'any' agar TypeScript tidak error mencari .ethereum
+      const ethereum = (window as any).ethereum;
+      
       const isInCoinbaseWallet =
-        window.ethereum?.isCoinbaseWallet ||
-        window.ethereum?.isCoinbaseWalletExtension ||
-        window.ethereum?.isCoinbaseWalletBrowser;
+        ethereum?.isCoinbaseWallet ||
+        ethereum?.isCoinbaseWalletExtension ||
+        ethereum?.isCoinbaseWalletBrowser;
       setIsCoinbaseWallet(!!isInCoinbaseWallet);
     };
-    checkCoinbaseWallet();
-    window.addEventListener('ethereum#initialized', checkCoinbaseWallet);
-    return () => window.removeEventListener('ethereum#initialized', checkCoinbaseWallet);
+
+    if (typeof window !== 'undefined') {
+      checkCoinbaseWallet();
+      window.addEventListener('ethereum#initialized', checkCoinbaseWallet);
+      return () => window.removeEventListener('ethereum#initialized', checkCoinbaseWallet);
+    }
   }, []);
 
   useEffect(() => {
-    if (isCoinbaseWallet && !isConnected) {
+    if (isCoinbaseWallet && !isConnected && connectors.length > 1) {
       connect({ connector: connectors[1] });
     }
   }, [isCoinbaseWallet, isConnected, connect, connectors]);
@@ -40,7 +46,6 @@ function useCoinbaseWalletAutoConnect() {
 export const config = createConfig({
   chains: [base, optimism, mainnet, degen, unichain, celo],
   transports: {
-    // ✅ Pakai RPC publik yang reliable untuk Base
     [base.id]: http('https://mainnet.base.org'),
     [optimism.id]: http('https://mainnet.optimism.io'),
     [mainnet.id]: http('https://cloudflare-eth.com'),
@@ -67,7 +72,6 @@ export const config = createConfig({
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // ✅ Retry otomatis kalau RPC gagal
       retry: 3,
       retryDelay: 1000,
     },
