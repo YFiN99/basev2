@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAccount, useConnect } from "wagmi";
 import { useAddLiquidity, useRemoveLiquidity, usePoolInfo, useLPBalance } from "~/hooks/useLiquidity";
 import { useTokenBalance } from "~/hooks/useTokenBalance";
-import { BASE_TOKENS, Token } from "~/lib/constants";
+import { useTokenList } from "~/hooks/useTokenList";
+import { Token } from "~/lib/constants";
 
 function TokenButton({ token, onClick }: { token: Token | null; onClick: () => void }) {
   return (
@@ -26,13 +27,14 @@ function TokenButton({ token, onClick }: { token: Token | null; onClick: () => v
   );
 }
 
-function TokenModal({ onSelect, onClose, exclude }: {
+function TokenModal({ onSelect, onClose, exclude, tokens }: {
   onSelect: (t: Token) => void;
   onClose: () => void;
   exclude?: Token | null;
+  tokens: Token[];
 }) {
   const [search, setSearch] = useState("");
-  const filtered = BASE_TOKENS.filter(t =>
+  const filtered = tokens.filter(t =>
     t.symbol !== exclude?.symbol &&
     (t.symbol.toLowerCase().includes(search.toLowerCase()) ||
       t.name.toLowerCase().includes(search.toLowerCase()))
@@ -46,10 +48,7 @@ function TokenModal({ onSelect, onClose, exclude }: {
           <span style={{ fontSize: "16px", fontWeight: 700 }}>Select Token</span>
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer", color: "#888" }}>X</button>
         </div>
-        <input
-          placeholder="Search token..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+        <input placeholder="Search token..." value={search} onChange={(e) => setSearch(e.target.value)}
           style={{ width: "100%", padding: "10px 14px", borderRadius: "14px", border: "1px solid #E8ECEF", fontSize: "14px", outline: "none", marginBottom: "12px", boxSizing: "border-box" }}
         />
         {filtered.map((t) => (
@@ -72,17 +71,27 @@ function TokenModal({ onSelect, onClose, exclude }: {
 const SLIPPAGE_OPTIONS = [1, 5, 10, 49];
 
 export function LiquidityWidget() {
+  const { tokens } = useTokenList();
+
   const [mode, setMode] = useState<"add" | "remove">("add");
   const [slippage, setSlippage] = useState(5);
 
-  const [tokenA, setTokenA] = useState<Token>(BASE_TOKENS[0]);
-  const [tokenB, setTokenB] = useState<Token>(BASE_TOKENS[1]);
+  const [tokenA, setTokenA] = useState<Token | null>(null);
+  const [tokenB, setTokenB] = useState<Token | null>(null);
 
   const [amountA, setAmountA] = useState("");
   const [amountB, setAmountB] = useState("");
 
   const [showModalA, setShowModalA] = useState(false);
   const [showModalB, setShowModalB] = useState(false);
+
+  // Set default tokens setelah list loaded
+  useEffect(() => {
+    if (tokens.length >= 2 && !tokenA && !tokenB) {
+      setTokenA(tokens[0]);
+      setTokenB(tokens[1]);
+    }
+  }, [tokens]);
 
   const { address, isConnected } = useAccount();
   const { connect, connectors } = useConnect();
@@ -93,19 +102,17 @@ export function LiquidityWidget() {
   const { reserve0, reserve1, isValidPair, pairAddress } = usePoolInfo(tokenA, tokenB);
   const { lpFormatted, lpBalance } = useLPBalance(pairAddress, address);
 
-  const { formatted: balanceA } = useTokenBalance(tokenA, address);
-  const { formatted: balanceB } = useTokenBalance(tokenB, address);
+  const { formatted: balanceA } = useTokenBalance(tokenA!, address);
+  const { formatted: balanceB } = useTokenBalance(tokenB!, address);
 
-  // Auto-calculate token B saat user input token A
   const handleAmountAChange = (val: string) => {
     setAmountA(val);
     if (isValidPair && val && Number(reserve0) > 0 && Number(reserve1) > 0) {
       const ratio = Number(reserve1) / Number(reserve0);
-      setAmountB((Number(val) * ratio).toFixed(tokenB.decimals > 6 ? 6 : tokenB.decimals));
+      setAmountB((Number(val) * ratio).toFixed((tokenB?.decimals ?? 18) > 6 ? 6 : (tokenB?.decimals ?? 6)));
     }
   };
 
-  // Auto-calculate token A saat user input token B
   const handleAmountBChange = (val: string) => {
     setAmountB(val);
     if (isValidPair && val && Number(reserve0) > 0 && Number(reserve1) > 0) {
@@ -115,7 +122,7 @@ export function LiquidityWidget() {
   };
 
   const handleAdd = async () => {
-    if (!address) return;
+    if (!address || !tokenA || !tokenB) return;
     try {
       resetAdd();
       if (tokenA.isNative) {
@@ -129,7 +136,7 @@ export function LiquidityWidget() {
   };
 
   const handleRemove = async () => {
-    if (!address || !lpBalance) return;
+    if (!address || !lpBalance || !tokenA || !tokenB) return;
     try {
       resetRemove();
       const slippageFactor = 1 - slippage / 100;
@@ -193,12 +200,12 @@ export function LiquidityWidget() {
         <div style={{ background: "#fff", borderRadius: "16px", padding: "14px 16px", marginBottom: "12px", border: "1px solid #E8ECEF" }}>
           <div style={{ fontSize: "12px", color: "#888", marginBottom: "8px", fontWeight: 600 }}>POOL INFO</div>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
-            <span style={{ fontSize: "13px", color: "#888" }}>{tokenA.symbol} Reserve</span>
-            <span style={{ fontSize: "13px", fontWeight: 600 }}>{Number(reserve0).toFixed(4)} {tokenA.symbol}</span>
+            <span style={{ fontSize: "13px", color: "#888" }}>{tokenA?.symbol} Reserve</span>
+            <span style={{ fontSize: "13px", fontWeight: 600 }}>{Number(reserve0).toFixed(4)} {tokenA?.symbol}</span>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
-            <span style={{ fontSize: "13px", color: "#888" }}>{tokenB.symbol} Reserve</span>
-            <span style={{ fontSize: "13px", fontWeight: 600 }}>{Number(reserve1).toFixed(4)} {tokenB.symbol}</span>
+            <span style={{ fontSize: "13px", color: "#888" }}>{tokenB?.symbol} Reserve</span>
+            <span style={{ fontSize: "13px", fontWeight: 600 }}>{Number(reserve1).toFixed(4)} {tokenB?.symbol}</span>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between" }}>
             <span style={{ fontSize: "13px", color: "#888" }}>Your LP tokens</span>
@@ -217,24 +224,18 @@ export function LiquidityWidget() {
 
       {mode === "add" ? (
         <div style={{ background: "#fff", borderRadius: "24px", padding: "4px", boxShadow: "0 4px 24px rgba(0,0,0,0.08)", border: "1px solid #E8ECEF" }}>
-
-          {/* Token A */}
           <div style={{ background: "#F7F8FA", borderRadius: "20px", padding: "16px", marginBottom: "4px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-              <span style={{ fontSize: "13px", color: "#888" }}>{tokenA.symbol} Amount</span>
+              <span style={{ fontSize: "13px", color: "#888" }}>{tokenA?.symbol} Amount</span>
               <span style={{ fontSize: "12px", color: "#888" }}>
                 Balance: <span style={{ color: "#000", fontWeight: 500, cursor: "pointer", textDecoration: "underline" }}
                   onClick={() => handleAmountAChange(balanceA)}>{balanceA}</span>
               </span>
             </div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <input
-                type="number"
-                value={amountA}
-                placeholder="0.0"
+              <input type="number" value={amountA} placeholder="0.0"
                 onChange={(e) => handleAmountAChange(e.target.value)}
-                style={{ background: "none", border: "none", outline: "none", fontSize: "32px", fontWeight: 500, width: "55%", color: amountA ? "#000" : "#C3C5CB" }}
-              />
+                style={{ background: "none", border: "none", outline: "none", fontSize: "32px", fontWeight: 500, width: "55%", color: amountA ? "#000" : "#C3C5CB" }} />
               <TokenButton token={tokenA} onClick={() => setShowModalA(true)} />
             </div>
           </div>
@@ -243,46 +244,32 @@ export function LiquidityWidget() {
             <div style={{ width: "32px", height: "32px", borderRadius: "10px", background: "#fff", border: "4px solid #F7F8FA", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px" }}>+</div>
           </div>
 
-          {/* Token B */}
           <div style={{ background: "#F7F8FA", borderRadius: "20px", padding: "16px", marginTop: "4px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-              <span style={{ fontSize: "13px", color: "#888" }}>{tokenB.symbol} Amount</span>
+              <span style={{ fontSize: "13px", color: "#888" }}>{tokenB?.symbol} Amount</span>
               <span style={{ fontSize: "12px", color: "#888" }}>
                 Balance: <span style={{ color: "#000", fontWeight: 500, cursor: "pointer", textDecoration: "underline" }}
                   onClick={() => handleAmountBChange(balanceB)}>{balanceB}</span>
               </span>
             </div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <input
-                type="number"
-                value={amountB}
-                placeholder={isValidPair ? "Auto" : "0.0"}
+              <input type="number" value={amountB} placeholder={isValidPair ? "Auto" : "0.0"}
                 onChange={(e) => handleAmountBChange(e.target.value)}
-                style={{ background: "none", border: "none", outline: "none", fontSize: "32px", fontWeight: 500, width: "55%", color: amountB ? "#000" : "#C3C5CB" }}
-              />
+                style={{ background: "none", border: "none", outline: "none", fontSize: "32px", fontWeight: 500, width: "55%", color: amountB ? "#000" : "#C3C5CB" }} />
               <TokenButton token={tokenB} onClick={() => setShowModalB(true)} />
             </div>
           </div>
 
-          {/* Rate info */}
           {isValidPair && amountA && amountB && (
             <div style={{ padding: "8px 16px", display: "flex", justifyContent: "space-between" }}>
               <span style={{ fontSize: "12px", color: "#888" }}>Rate</span>
-              <span style={{ fontSize: "12px", color: "#888" }}>
-                1 {tokenA.symbol} = {(Number(amountB) / Number(amountA)).toFixed(4)} {tokenB.symbol}
-              </span>
+              <span style={{ fontSize: "12px", color: "#888" }}>1 {tokenA?.symbol} = {(Number(amountB) / Number(amountA)).toFixed(4)} {tokenB?.symbol}</span>
             </div>
           )}
 
           <div style={{ padding: "4px" }}>
             <button onClick={handleAdd} disabled={isAdding || isAddConfirming || !amountA || !amountB}
-              style={{
-                width: "100%", padding: "16px", borderRadius: "20px",
-                background: isAdding || isAddConfirming ? "#F7F8FA" : "#FF007A",
-                border: "none", cursor: isAdding || isAddConfirming ? "not-allowed" : "pointer",
-                fontSize: "18px", fontWeight: 600,
-                color: isAdding || isAddConfirming ? "#C3C5CB" : "#fff",
-              }}>
+              style={{ width: "100%", padding: "16px", borderRadius: "20px", background: isAdding || isAddConfirming ? "#F7F8FA" : "#FF007A", border: "none", cursor: isAdding || isAddConfirming ? "not-allowed" : "pointer", fontSize: "18px", fontWeight: 600, color: isAdding || isAddConfirming ? "#C3C5CB" : "#fff" }}>
               {isAdding ? "⏳ Confirm..." : isAddConfirming ? "⛓️ Processing..." : `Supply (${slippage}% slippage)`}
             </button>
           </div>
@@ -298,18 +285,12 @@ export function LiquidityWidget() {
             <TokenButton token={tokenB} onClick={() => setShowModalB(true)} />
           </div>
           <button onClick={handleRemove} disabled={isRemoving || isRemoveConfirming || !lpBalance || lpBalance === 0n}
-            style={{
-              width: "100%", padding: "16px", borderRadius: "20px",
-              background: isRemoving || isRemoveConfirming || !lpBalance ? "#F7F8FA" : "#FF007A",
-              border: "none", cursor: "pointer", fontSize: "18px", fontWeight: 600,
-              color: isRemoving || isRemoveConfirming || !lpBalance ? "#C3C5CB" : "#fff",
-            }}>
+            style={{ width: "100%", padding: "16px", borderRadius: "20px", background: isRemoving || isRemoveConfirming || !lpBalance ? "#F7F8FA" : "#FF007A", border: "none", cursor: "pointer", fontSize: "18px", fontWeight: 600, color: isRemoving || isRemoveConfirming || !lpBalance ? "#C3C5CB" : "#fff" }}>
             {isRemoving ? "⏳ Confirm..." : isRemoveConfirming ? "⛓️ Processing..." : `Remove Liquidity (${slippage}% slippage)`}
           </button>
         </div>
       )}
 
-      {/* Success */}
       {(isAddSuccess || isRemoveSuccess) && (
         <div style={{ background: "#E8F5E9", borderRadius: "16px", padding: "16px", marginTop: "8px", border: "1px solid #81C784", textAlign: "center" }}>
           <div style={{ fontSize: "15px", fontWeight: 600, color: "#2E7D32", marginBottom: "6px" }}>✅ Transaction Successful!</div>
@@ -317,7 +298,6 @@ export function LiquidityWidget() {
         </div>
       )}
 
-      {/* Error */}
       {(addError || removeError) && (
         <div style={{ background: "#FFEBEE", borderRadius: "16px", padding: "16px", marginTop: "8px", border: "1px solid #EF9A9A" }}>
           <div style={{ fontSize: "13px", fontWeight: 600, color: "#C62828" }}>❌ Failed</div>
@@ -325,23 +305,8 @@ export function LiquidityWidget() {
         </div>
       )}
 
-      {/* Modal Token A */}
-      {showModalA && (
-        <TokenModal
-          onSelect={(t) => { setTokenA(t); setAmountA(""); setAmountB(""); setShowModalA(false); }}
-          onClose={() => setShowModalA(false)}
-          exclude={tokenB}
-        />
-      )}
-
-      {/* Modal Token B */}
-      {showModalB && (
-        <TokenModal
-          onSelect={(t) => { setTokenB(t); setAmountA(""); setAmountB(""); setShowModalB(false); }}
-          onClose={() => setShowModalB(false)}
-          exclude={tokenA}
-        />
-      )}
+      {showModalA && <TokenModal tokens={tokens} onSelect={(t) => { setTokenA(t); setAmountA(""); setAmountB(""); setShowModalA(false); }} onClose={() => setShowModalA(false)} exclude={tokenB} />}
+      {showModalB && <TokenModal tokens={tokens} onSelect={(t) => { setTokenB(t); setAmountA(""); setAmountB(""); setShowModalB(false); }} onClose={() => setShowModalB(false)} exclude={tokenA} />}
     </div>
   );
 }

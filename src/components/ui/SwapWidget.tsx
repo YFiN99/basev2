@@ -5,19 +5,21 @@ import { useAccount, useConnect } from "wagmi";
 import { useSwapPrice } from "~/hooks/useSwapPrice";
 import { useSwap } from "~/hooks/useSwap";
 import { useTokenBalance } from "~/hooks/useTokenBalance";
-import { BASE_TOKENS, Token } from "~/lib/constants";
-import { saveTx } from "~/components/ui/HistoryWidget"; // ✅ tambah import
+import { useTokenList } from "~/hooks/useTokenList";
+import { Token } from "~/lib/constants";
+import { saveTx } from "~/components/ui/HistoryWidget";
 
 function TokenModal({
-  onSelect, onClose, exclude,
+  onSelect, onClose, exclude, tokens,
 }: {
   onSelect: (t: Token) => void;
   onClose: () => void;
   exclude?: Token | null;
+  tokens: Token[];
 }) {
   const [search, setSearch] = useState("");
   const [customAddress, setCustomAddress] = useState("");
-  const filtered = BASE_TOKENS.filter(
+  const filtered = tokens.filter(
     (t) => t.symbol !== exclude?.symbol &&
       (t.symbol.toLowerCase().includes(search.toLowerCase()) ||
         t.name.toLowerCase().includes(search.toLowerCase()))
@@ -45,7 +47,7 @@ function TokenModal({
         </div>
         <div style={{ fontSize: "12px", color: "#888", marginBottom: "8px" }}>Common tokens</div>
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "16px" }}>
-          {BASE_TOKENS.slice(0, 4).filter(t => t.symbol !== exclude?.symbol).map((t) => (
+          {tokens.slice(0, 4).filter(t => t.symbol !== exclude?.symbol).map((t) => (
             <button key={t.symbol} onClick={() => onSelect(t)} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "6px 12px", borderRadius: "20px", border: "1px solid #E8ECEF", background: "#F7F8FA", cursor: "pointer", fontSize: "13px", fontWeight: 600 }}>
               <div style={{ width: "20px", height: "20px", borderRadius: "50%", background: t.logoColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", color: "#fff" }}>{t.logoText}</div>
               {t.symbol}
@@ -85,27 +87,36 @@ function TokenButton({ token, onClick }: { token: Token | null; onClick: () => v
 }
 
 export function SwapWidget() {
-  const [tokenIn, setTokenIn]   = useState<Token>(BASE_TOKENS[0]);
-  const [tokenOut, setTokenOut] = useState<Token>(BASE_TOKENS[1]);
+  const { tokens, isLoading: tokensLoading } = useTokenList();
+
+  const [tokenIn, setTokenIn]   = useState<Token | null>(null);
+  const [tokenOut, setTokenOut] = useState<Token | null>(null);
   const [amountIn, setAmountIn] = useState("");
   const [slippage, setSlippage] = useState(0.5);
   const [showSettings, setShowSettings] = useState(false);
   const [showTokenInModal, setShowTokenInModal]   = useState(false);
   const [showTokenOutModal, setShowTokenOutModal] = useState(false);
 
+  // Set default token setelah tokens loaded
+  useEffect(() => {
+    if (tokens.length >= 2 && !tokenIn && !tokenOut) {
+      setTokenIn(tokens[0]);
+      setTokenOut(tokens[1]);
+    }
+  }, [tokens]);
+
   const { address, isConnected } = useAccount();
   const { connect, connectors }  = useConnect();
 
-  const { amountOut, isLoading: priceLoading } = useSwapPrice(tokenIn, tokenOut, amountIn);
+  const { amountOut, isLoading: priceLoading } = useSwapPrice(tokenIn!, tokenOut!, amountIn);
   const { swap, txHash, isPending, isConfirming, isSuccess, error, reset } = useSwap();
 
-  const { formatted: rawIn,  isLoading: loadingIn  } = useTokenBalance(tokenIn,  address as `0x${string}` | undefined);
-  const { formatted: rawOut, isLoading: loadingOut } = useTokenBalance(tokenOut, address as `0x${string}` | undefined);
+  const { formatted: rawIn,  isLoading: loadingIn  } = useTokenBalance(tokenIn!,  address as `0x${string}` | undefined);
+  const { formatted: rawOut, isLoading: loadingOut } = useTokenBalance(tokenOut!, address as `0x${string}` | undefined);
 
   const balanceIn  = loadingIn  ? "..." : (!rawIn  || rawIn  === "NaN" || isNaN(Number(rawIn)))  ? "0.0000" : rawIn;
   const balanceOut = loadingOut ? "..." : (!rawOut || rawOut === "NaN" || isNaN(Number(rawOut))) ? "0.0000" : rawOut;
 
-  // ✅ Simpan ke history saat swap sukses
   useEffect(() => {
     if (isSuccess && txHash && tokenIn && tokenOut) {
       saveTx({
@@ -121,7 +132,7 @@ export function SwapWidget() {
     }
   }, [isSuccess, txHash]);
 
-  const isDisabled = isPending || isConfirming || !amountIn || Number(amountIn) <= 0 || priceLoading;
+  const isDisabled = isPending || isConfirming || !amountIn || Number(amountIn) <= 0 || priceLoading || !tokenIn || !tokenOut;
 
   const handleSwitch = useCallback(() => {
     setTokenIn(tokenOut);
@@ -139,6 +150,17 @@ export function SwapWidget() {
   const fee  = Number(amountIn) > 0 ? (Number(amountIn) * 0.003).toFixed(6) : "0";
   const rate = Number(amountIn) > 0 && Number(amountOut) > 0
     ? (Number(amountOut) / Number(amountIn)).toFixed(4) : "0";
+
+  if (tokensLoading && !tokenIn) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: "32px", marginBottom: "8px" }}>🦄</div>
+          <p style={{ color: "#888", fontSize: "14px" }}>Loading tokens...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: "100vh", background: "#F7F8FA", display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: "20px", paddingBottom: "100px", fontFamily: "'Inter', sans-serif" }}>
@@ -171,10 +193,8 @@ export function SwapWidget() {
               <span style={{ fontSize: "14px", color: "#888" }}>You pay</span>
               <span style={{ fontSize: "13px", color: "#888" }}>
                 Balance:{" "}
-                <span
-                  style={{ color: loadingIn ? "#888" : "#000", fontWeight: 500, cursor: loadingIn ? "default" : "pointer", textDecoration: loadingIn ? "none" : "underline" }}
-                  onClick={() => { if (!loadingIn && balanceIn !== "0.0000") setAmountIn(balanceIn); }}
-                >
+                <span style={{ color: loadingIn ? "#888" : "#000", fontWeight: 500, cursor: loadingIn ? "default" : "pointer", textDecoration: loadingIn ? "none" : "underline" }}
+                  onClick={() => { if (!loadingIn && balanceIn !== "0.0000") setAmountIn(balanceIn); }}>
                   {balanceIn}
                 </span>
               </span>
@@ -184,14 +204,11 @@ export function SwapWidget() {
                 style={{ background: "none", border: "none", outline: "none", fontSize: "36px", fontWeight: 500, width: "55%", color: amountIn ? "#000" : "#C3C5CB" }} />
               <TokenButton token={tokenIn} onClick={() => setShowTokenInModal(true)} />
             </div>
-            {Number(amountIn) > 0 && <div style={{ fontSize: "13px", color: "#888", marginTop: "4px" }}>approx ${(Number(amountIn) * 2637).toFixed(2)}</div>}
           </div>
 
           {/* Switch */}
           <div style={{ display: "flex", justifyContent: "center", margin: "-2px 0", position: "relative", zIndex: 1 }}>
-            <button onClick={handleSwitch} style={{ width: "36px", height: "36px", borderRadius: "12px", background: "#fff", border: "4px solid #F7F8FA", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: "18px", fontWeight: 700, color: "#888", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
-              {"↕"}
-            </button>
+            <button onClick={handleSwitch} style={{ width: "36px", height: "36px", borderRadius: "12px", background: "#fff", border: "4px solid #F7F8FA", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: "18px", fontWeight: 700, color: "#888", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>↕</button>
           </div>
 
           {/* TO */}
@@ -206,12 +223,11 @@ export function SwapWidget() {
               </div>
               <TokenButton token={tokenOut} onClick={() => setShowTokenOutModal(true)} />
             </div>
-            {Number(amountOut) > 0 && <div style={{ fontSize: "13px", color: "#888", marginTop: "4px" }}>approx ${Number(amountOut).toFixed(2)}</div>}
           </div>
 
           {Number(amountIn) > 0 && Number(amountOut) > 0 && (
             <div style={{ padding: "10px 16px", display: "flex", justifyContent: "space-between" }}>
-              <span style={{ fontSize: "13px", color: "#888" }}>1 {tokenIn.symbol} = {rate} {tokenOut.symbol}</span>
+              <span style={{ fontSize: "13px", color: "#888" }}>1 {tokenIn?.symbol} = {rate} {tokenOut?.symbol}</span>
               <span style={{ fontSize: "13px", color: "#888" }}>gas ~$0.50</span>
             </div>
           )}
@@ -223,7 +239,7 @@ export function SwapWidget() {
               <button disabled style={{ width: "100%", padding: "16px", borderRadius: "20px", background: "#F7F8FA", border: "none", fontSize: "18px", fontWeight: 600, color: "#C3C5CB", cursor: "not-allowed" }}>Enter an amount</button>
             ) : (
               <button onClick={handleSwap} disabled={isDisabled} style={{ width: "100%", padding: "16px", borderRadius: "20px", background: isDisabled ? "#F7F8FA" : "#FF007A", border: "none", cursor: isDisabled ? "not-allowed" : "pointer", fontSize: "18px", fontWeight: 600, color: isDisabled ? "#C3C5CB" : "#fff", transition: "all .2s" }}>
-                {isPending ? "Confirm in wallet..." : isConfirming ? "Processing..." : "Swap " + tokenIn.symbol + " to " + tokenOut.symbol}
+                {isPending ? "Confirm in wallet..." : isConfirming ? "Processing..." : `Swap ${tokenIn?.symbol} to ${tokenOut?.symbol}`}
               </button>
             )}
           </div>
@@ -237,11 +253,11 @@ export function SwapWidget() {
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
               <span style={{ fontSize: "13px", color: "#888" }}>Liquidity fee (0.3%)</span>
-              <span style={{ fontSize: "13px", color: "#000", fontWeight: 500 }}>{fee} {tokenIn.symbol}</span>
+              <span style={{ fontSize: "13px", color: "#000", fontWeight: 500 }}>{fee} {tokenIn?.symbol}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
               <span style={{ fontSize: "13px", color: "#888" }}>Route</span>
-              <span style={{ fontSize: "13px", color: "#000", fontWeight: 500 }}>{tokenIn.symbol} → {tokenOut.symbol}</span>
+              <span style={{ fontSize: "13px", color: "#000", fontWeight: 500 }}>{tokenIn?.symbol} → {tokenOut?.symbol}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span style={{ fontSize: "13px", color: "#888" }}>Slippage</span>
@@ -271,8 +287,8 @@ export function SwapWidget() {
         </div>
       </div>
 
-      {showTokenInModal && <TokenModal onSelect={(t) => { setTokenIn(t); setShowTokenInModal(false); reset(); }} onClose={() => setShowTokenInModal(false)} exclude={tokenOut} />}
-      {showTokenOutModal && <TokenModal onSelect={(t) => { setTokenOut(t); setShowTokenOutModal(false); reset(); }} onClose={() => setShowTokenOutModal(false)} exclude={tokenIn} />}
+      {showTokenInModal && <TokenModal tokens={tokens} onSelect={(t) => { setTokenIn(t); setShowTokenInModal(false); reset(); }} onClose={() => setShowTokenInModal(false)} exclude={tokenOut} />}
+      {showTokenOutModal && <TokenModal tokens={tokens} onSelect={(t) => { setTokenOut(t); setShowTokenOutModal(false); reset(); }} onClose={() => setShowTokenOutModal(false)} exclude={tokenIn} />}
     </div>
   );
 }
