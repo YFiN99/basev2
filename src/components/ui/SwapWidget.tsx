@@ -6,6 +6,7 @@ import { useSwapPrice } from "~/hooks/useSwapPrice";
 import { useSwap } from "~/hooks/useSwap";
 import { useTokenBalance } from "~/hooks/useTokenBalance";
 import { useTokenList } from "~/hooks/useTokenList";
+import { useGasEstimate } from "~/hooks/useGasEstimate";
 import { Token } from "~/lib/constants";
 import { saveTx } from "~/components/ui/HistoryWidget";
 
@@ -88,6 +89,7 @@ function TokenButton({ token, onClick }: { token: Token | null; onClick: () => v
 
 export function SwapWidget() {
   const { tokens, isLoading: tokensLoading } = useTokenList();
+  const { gasUsd } = useGasEstimate(); // ← real gas estimate
 
   const [tokenIn, setTokenIn]   = useState<Token | null>(null);
   const [tokenOut, setTokenOut] = useState<Token | null>(null);
@@ -97,7 +99,6 @@ export function SwapWidget() {
   const [showTokenInModal, setShowTokenInModal]   = useState(false);
   const [showTokenOutModal, setShowTokenOutModal] = useState(false);
 
-  // Set default token setelah tokens loaded
   useEffect(() => {
     if (tokens.length >= 2 && !tokenIn && !tokenOut) {
       setTokenIn(tokens[0]);
@@ -166,7 +167,6 @@ export function SwapWidget() {
     <div style={{ minHeight: "100vh", background: "#F7F8FA", display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: "20px", paddingBottom: "100px", fontFamily: "'Inter', sans-serif" }}>
       <div style={{ width: "100%", maxWidth: "480px", padding: "0 16px" }}>
 
-        {/* Header */}
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "16px" }}>
           <button onClick={() => setShowSettings(!showSettings)} style={{ background: showSettings ? "#F7F8FA" : "none", border: "none", cursor: "pointer", fontSize: "20px", padding: "4px 8px", borderRadius: "8px" }}>
             {showSettings ? "X" : "⚙️"}
@@ -225,10 +225,13 @@ export function SwapWidget() {
             </div>
           </div>
 
+          {/* Rate + Gas real */}
           {Number(amountIn) > 0 && Number(amountOut) > 0 && (
             <div style={{ padding: "10px 16px", display: "flex", justifyContent: "space-between" }}>
               <span style={{ fontSize: "13px", color: "#888" }}>1 {tokenIn?.symbol} = {rate} {tokenOut?.symbol}</span>
-              <span style={{ fontSize: "13px", color: "#888" }}>gas ~$0.50</span>
+              <span style={{ fontSize: "13px", color: "#888" }}>
+                gas {gasUsd ?? "..."}
+              </span>
             </div>
           )}
 
@@ -259,9 +262,13 @@ export function SwapWidget() {
               <span style={{ fontSize: "13px", color: "#888" }}>Route</span>
               <span style={{ fontSize: "13px", color: "#000", fontWeight: 500 }}>{tokenIn?.symbol} → {tokenOut?.symbol}</span>
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
               <span style={{ fontSize: "13px", color: "#888" }}>Slippage</span>
               <span style={{ fontSize: "13px", color: "#000", fontWeight: 500 }}>{slippage}%</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <span style={{ fontSize: "13px", color: "#888" }}>Gas fee</span>
+              <span style={{ fontSize: "13px", color: "#000", fontWeight: 500 }}>{gasUsd ?? "..."}</span>
             </div>
           </div>
         )}
