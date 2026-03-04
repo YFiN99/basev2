@@ -1,6 +1,29 @@
 import { useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi';
-import { parseUnits, formatUnits } from 'viem';
+import { parseUnits, formatUnits, maxUint256 } from 'viem';
 import { BASE_CONTRACTS, Token } from '~/lib/constants';
+
+const ERC20_ABI = [
+  {
+    name: 'approve',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'spender', type: 'address' },
+      { name: 'amount',  type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
+  },
+  {
+    name: 'allowance',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'owner',   type: 'address' },
+      { name: 'spender', type: 'address' },
+    ],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+] as const;
 
 const ROUTER_ABI = [
   {
@@ -8,12 +31,12 @@ const ROUTER_ABI = [
     type: 'function',
     stateMutability: 'payable',
     inputs: [
-      { name: 'token',                type: 'address' },
-      { name: 'amountTokenDesired',   type: 'uint256' },
-      { name: 'amountTokenMin',       type: 'uint256' },
-      { name: 'amountETHMin',         type: 'uint256' },
-      { name: 'to',                   type: 'address' },
-      { name: 'deadline',             type: 'uint256' },
+      { name: 'token',              type: 'address' },
+      { name: 'amountTokenDesired', type: 'uint256' },
+      { name: 'amountTokenMin',     type: 'uint256' },
+      { name: 'amountETHMin',       type: 'uint256' },
+      { name: 'to',                 type: 'address' },
+      { name: 'deadline',           type: 'uint256' },
     ],
     outputs: [
       { name: 'amountToken', type: 'uint256' },
@@ -79,6 +102,16 @@ const PAIR_ABI = [
     inputs: [{ name: 'account', type: 'address' }],
     outputs: [{ name: '', type: 'uint256' }],
   },
+  {
+    name: 'approve',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'spender', type: 'address' },
+      { name: 'amount',  type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
+  },
 ] as const;
 
 // Hook untuk get pair address
@@ -137,7 +170,7 @@ export function useLPBalance(pairAddress: `0x${string}` | undefined, userAddress
   return { lpBalance: data as bigint | undefined, lpFormatted: Number(formatted).toFixed(6) };
 }
 
-// Hook untuk add liquidity
+// Hook untuk add liquidity (dengan auto-approve)
 export function useAddLiquidity() {
   const { writeContractAsync, data: txHash, isPending, error, reset } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash });
@@ -147,23 +180,26 @@ export function useAddLiquidity() {
     token: Token,
     tokenAmount: string,
     ethAmount: string,
-    slippage = 5  // default 5%, bisa dipass dari UI
+    slippage = 5
   ) => {
-    const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200);
+    const deadline          = BigInt(Math.floor(Date.now() / 1000) + 1200);
     const tokenAmountParsed = parseUnits(tokenAmount, token.decimals);
     const ethAmountParsed   = parseUnits(ethAmount, 18);
+    const slippageFactor    = 1 - slippage / 100;
+    const tokenMin          = parseUnits((Number(tokenAmount) * slippageFactor).toFixed(token.decimals), token.decimals);
+    const ethMin            = parseUnits((Number(ethAmount) * slippageFactor).toFixed(6), 18);
 
-    // Hitung min amount berdasarkan slippage yang dipilih user
-    const slippageFactor = 1 - slippage / 100;
-    const tokenMin = parseUnits(
-      (Number(tokenAmount) * slippageFactor).toFixed(token.decimals),
-      token.decimals
-    );
-    const ethMin = parseUnits(
-      (Number(ethAmount) * slippageFactor).toFixed(6),
-      18
-    );
+    // Step 1: Approve token ke Router dulu (kalau bukan native ETH)
+    if (!token.isNative) {
+      await writeContractAsync({
+        address: token.address,
+        abi: ERC20_ABI,
+        functionName: 'approve',
+        args: [BASE_CONTRACTS.ROUTER, maxUint256],
+      });
+    }
 
+    // Step 2: Add Liquidity
     return await writeContractAsync({
       address: BASE_CONTRACTS.ROUTER,
       abi: ROUTER_ABI,
@@ -176,7 +212,7 @@ export function useAddLiquidity() {
   return { addLiquidity, txHash, isPending, isConfirming, isSuccess, error, reset };
 }
 
-// Hook untuk remove liquidity
+// Hook untuk remove liquidity (dengan approve LP token)
 export function useRemoveLiquidity() {
   const { writeContractAsync, data: txHash, isPending, error, reset } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash });
@@ -186,12 +222,22 @@ export function useRemoveLiquidity() {
     token: Token,
     lpAmount: bigint,
     minToken: string,
-    minEth: string
+    minEth: string,
+    pairAddress: `0x${string}`
   ) => {
     const deadline       = BigInt(Math.floor(Date.now() / 1000) + 1200);
     const minTokenParsed = parseUnits(minToken, token.decimals);
     const minEthParsed   = parseUnits(minEth, 18);
 
+    // Step 1: Approve LP token ke Router
+    await writeContractAsync({
+      address: pairAddress,
+      abi: PAIR_ABI,
+      functionName: 'approve',
+      args: [BASE_CONTRACTS.ROUTER, lpAmount],
+    });
+
+    // Step 2: Remove Liquidity
     return await writeContractAsync({
       address: BASE_CONTRACTS.ROUTER,
       abi: ROUTER_ABI,

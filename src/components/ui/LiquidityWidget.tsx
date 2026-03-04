@@ -136,13 +136,14 @@ export function LiquidityWidget() {
   };
 
   const handleRemove = async () => {
-    if (!address || !lpBalance || !tokenA || !tokenB) return;
+    if (!address || !lpBalance || !tokenA || !tokenB || !pairAddress) return;
     try {
       resetRemove();
       const slippageFactor = 1 - slippage / 100;
       const minA = (Number(reserve0) * slippageFactor).toFixed(tokenA.decimals > 6 ? 6 : tokenA.decimals);
       const minB = (Number(reserve1) * slippageFactor).toFixed(tokenB.decimals > 6 ? 6 : tokenB.decimals);
-      await removeLiquidity(address, tokenB, lpBalance, minB, minA);
+      // Pass pairAddress untuk approve LP token
+      await removeLiquidity(address, tokenB, lpBalance, minB, minA, pairAddress);
     } catch (e) { console.error(e); }
   };
 
@@ -270,7 +271,7 @@ export function LiquidityWidget() {
           <div style={{ padding: "4px" }}>
             <button onClick={handleAdd} disabled={isAdding || isAddConfirming || !amountA || !amountB}
               style={{ width: "100%", padding: "16px", borderRadius: "20px", background: isAdding || isAddConfirming ? "#F7F8FA" : "#FF007A", border: "none", cursor: isAdding || isAddConfirming ? "not-allowed" : "pointer", fontSize: "18px", fontWeight: 600, color: isAdding || isAddConfirming ? "#C3C5CB" : "#fff" }}>
-              {isAdding ? "⏳ Confirm..." : isAddConfirming ? "⛓️ Processing..." : `Supply (${slippage}% slippage)`}
+              {isAdding ? "⏳ Approving..." : isAddConfirming ? "⛓️ Processing..." : `Supply (${slippage}% slippage)`}
             </button>
           </div>
         </div>
@@ -286,7 +287,7 @@ export function LiquidityWidget() {
           </div>
           <button onClick={handleRemove} disabled={isRemoving || isRemoveConfirming || !lpBalance || lpBalance === 0n}
             style={{ width: "100%", padding: "16px", borderRadius: "20px", background: isRemoving || isRemoveConfirming || !lpBalance ? "#F7F8FA" : "#FF007A", border: "none", cursor: "pointer", fontSize: "18px", fontWeight: 600, color: isRemoving || isRemoveConfirming || !lpBalance ? "#C3C5CB" : "#fff" }}>
-            {isRemoving ? "⏳ Confirm..." : isRemoveConfirming ? "⛓️ Processing..." : `Remove Liquidity (${slippage}% slippage)`}
+            {isRemoving ? "⏳ Approving..." : isRemoveConfirming ? "⛓️ Processing..." : `Remove Liquidity (${slippage}% slippage)`}
           </button>
         </div>
       )}
