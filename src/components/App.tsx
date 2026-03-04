@@ -1,5 +1,4 @@
 "use client";
-
 import { useEffect } from "react";
 import { useMiniApp } from "@neynar/react";
 import sdk from "@farcaster/miniapp-sdk";
@@ -60,6 +59,23 @@ export default function App({ title }: AppProps = {}) {
       paddingLeft:   context?.client.safeAreaInsets?.left   ?? 0,
       paddingRight:  context?.client.safeAreaInsets?.right  ?? 0,
     }}>
+
+      {/* Header */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: "10px",
+        padding: "12px 16px", background: "#fff",
+        borderBottom: "1px solid #E8ECEF",
+        position: "sticky", top: 0, zIndex: 40,
+      }}>
+        <img src="/icon.png" width={28} height={28} style={{ borderRadius: "8px" }} />
+        <span style={{ fontWeight: 700, fontSize: "16px", color: "#000" }}>UniswapV2</span>
+        <span style={{
+          marginLeft: "auto", fontSize: "11px",
+          background: "#0052FF", color: "#fff",
+          padding: "2px 8px", borderRadius: "8px", fontWeight: 600,
+        }}>Base</span>
+      </div>
+
       <div style={{ paddingBottom: "80px" }}>
         {currentTab === Tab.Swap      && <SwapWidget />}
         {currentTab === Tab.Liquidity && <LiquidityWidget />}
