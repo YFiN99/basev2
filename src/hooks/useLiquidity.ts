@@ -26,12 +26,12 @@ const ROUTER_ABI = [
     type: 'function',
     stateMutability: 'nonpayable',
     inputs: [
-      { name: 'token',        type: 'address' },
-      { name: 'liquidity',    type: 'uint256' },
+      { name: 'token',          type: 'address' },
+      { name: 'liquidity',      type: 'uint256' },
       { name: 'amountTokenMin', type: 'uint256' },
-      { name: 'amountETHMin', type: 'uint256' },
-      { name: 'to',           type: 'address' },
-      { name: 'deadline',     type: 'uint256' },
+      { name: 'amountETHMin',   type: 'uint256' },
+      { name: 'to',             type: 'address' },
+      { name: 'deadline',       type: 'uint256' },
     ],
     outputs: [
       { name: 'amountToken', type: 'uint256' },
@@ -60,9 +60,9 @@ const PAIR_ABI = [
     stateMutability: 'view',
     inputs: [],
     outputs: [
-      { name: 'reserve0', type: 'uint112' },
-      { name: 'reserve1', type: 'uint112' },
-      { name: 'blockTimestampLast', type: 'uint32' },
+      { name: 'reserve0',           type: 'uint112' },
+      { name: 'reserve1',           type: 'uint112' },
+      { name: 'blockTimestampLast', type: 'uint32'  },
     ],
   },
   {
@@ -147,13 +147,22 @@ export function useAddLiquidity() {
     token: Token,
     tokenAmount: string,
     ethAmount: string,
-    slippage = 0.5
+    slippage = 5  // default 5%, bisa dipass dari UI
   ) => {
     const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200);
     const tokenAmountParsed = parseUnits(tokenAmount, token.decimals);
     const ethAmountParsed   = parseUnits(ethAmount, 18);
-    const tokenMin = parseUnits((Number(tokenAmount) * (1 - slippage / 100)).toFixed(token.decimals), token.decimals);
-    const ethMin   = parseUnits((Number(ethAmount)   * (1 - slippage / 100)).toFixed(6), 18);
+
+    // Hitung min amount berdasarkan slippage yang dipilih user
+    const slippageFactor = 1 - slippage / 100;
+    const tokenMin = parseUnits(
+      (Number(tokenAmount) * slippageFactor).toFixed(token.decimals),
+      token.decimals
+    );
+    const ethMin = parseUnits(
+      (Number(ethAmount) * slippageFactor).toFixed(6),
+      18
+    );
 
     return await writeContractAsync({
       address: BASE_CONTRACTS.ROUTER,
@@ -179,7 +188,7 @@ export function useRemoveLiquidity() {
     minToken: string,
     minEth: string
   ) => {
-    const deadline  = BigInt(Math.floor(Date.now() / 1000) + 1200);
+    const deadline       = BigInt(Math.floor(Date.now() / 1000) + 1200);
     const minTokenParsed = parseUnits(minToken, token.decimals);
     const minEthParsed   = parseUnits(minEth, 18);
 

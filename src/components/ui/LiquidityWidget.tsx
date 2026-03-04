@@ -26,7 +26,6 @@ function TokenButton({ token, onClick }: { token: Token | null; onClick: () => v
   );
 }
 
-// ✅ Token modal generik, bisa exclude token tertentu
 function TokenModal({ onSelect, onClose, exclude }: {
   onSelect: (t: Token) => void;
   onClose: () => void;
@@ -70,16 +69,18 @@ function TokenModal({ onSelect, onClose, exclude }: {
   );
 }
 
+// Slippage options
+const SLIPPAGE_OPTIONS = [1, 5, 10, 49];
+
 export function LiquidityWidget() {
   const [mode, setMode] = useState<"add" | "remove">("add");
+  const [slippage, setSlippage] = useState(5); // default 5%
 
-  // ✅ Dua token bisa dipilih bebas
   const [tokenA, setTokenA] = useState<Token>(BASE_TOKENS[0]); // ETH default
   const [tokenB, setTokenB] = useState<Token>(BASE_TOKENS[1]); // USDC default
 
   const [amountA, setAmountA] = useState("");
   const [amountB, setAmountB] = useState("");
-  const [lpAmount, setLpAmount] = useState("");
 
   const [showModalA, setShowModalA] = useState(false);
   const [showModalB, setShowModalB] = useState(false);
@@ -100,14 +101,12 @@ export function LiquidityWidget() {
     if (!address) return;
     try {
       resetAdd();
-      // Tentukan mana yang ETH (native) untuk addLiquidity
       if (tokenA.isNative) {
-        await addLiquidity(address, tokenB, amountB, amountA);
+        await addLiquidity(address, tokenB, amountB, amountA, slippage);
       } else if (tokenB.isNative) {
-        await addLiquidity(address, tokenA, amountA, amountB);
+        await addLiquidity(address, tokenA, amountA, amountB, slippage);
       } else {
-        // Token vs Token — sesuaikan dengan useLiquidity kamu
-        await addLiquidity(address, tokenB, amountB, amountA);
+        await addLiquidity(address, tokenB, amountB, amountA, slippage);
       }
     } catch (e) { console.error(e); }
   };
@@ -116,8 +115,9 @@ export function LiquidityWidget() {
     if (!address || !lpBalance) return;
     try {
       resetRemove();
-      const minA = (Number(reserve0) * 0.995).toFixed(tokenA.decimals > 6 ? 6 : tokenA.decimals);
-      const minB = (Number(reserve1) * 0.995).toFixed(tokenB.decimals > 6 ? 6 : tokenB.decimals);
+      const slippageFactor = 1 - slippage / 100;
+      const minA = (Number(reserve0) * slippageFactor).toFixed(tokenA.decimals > 6 ? 6 : tokenA.decimals);
+      const minB = (Number(reserve1) * slippageFactor).toFixed(tokenB.decimals > 6 ? 6 : tokenB.decimals);
       await removeLiquidity(address, tokenB, lpBalance, minB, minA);
     } catch (e) { console.error(e); }
   };
@@ -151,6 +151,23 @@ export function LiquidityWidget() {
               color: mode === m ? "#fff" : "#888",
             }}>{m === "add" ? "Add" : "Remove"}</button>
           ))}
+        </div>
+      </div>
+
+      {/* Slippage Selector */}
+      <div style={{ background: "#fff", borderRadius: "16px", padding: "12px 16px", marginBottom: "12px", border: "1px solid #E8ECEF" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span style={{ fontSize: "13px", color: "#888", fontWeight: 600 }}>Slippage Tolerance</span>
+          <div style={{ display: "flex", gap: "6px" }}>
+            {SLIPPAGE_OPTIONS.map((s) => (
+              <button key={s} onClick={() => setSlippage(s)} style={{
+                padding: "4px 10px", borderRadius: "8px", fontSize: "12px",
+                border: "none", cursor: "pointer", fontWeight: 600,
+                background: slippage === s ? "#FF007A" : "#E8ECEF",
+                color: slippage === s ? "#fff" : "#888",
+              }}>{s}%</button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -188,7 +205,6 @@ export function LiquidityWidget() {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <input type="number" value={amountA} placeholder="0.0" onChange={(e) => setAmountA(e.target.value)}
                 style={{ background: "none", border: "none", outline: "none", fontSize: "32px", fontWeight: 500, width: "55%", color: amountA ? "#000" : "#C3C5CB" }} />
-              {/* ✅ Token A bisa diganti */}
               <TokenButton token={tokenA} onClick={() => setShowModalA(true)} />
             </div>
           </div>
@@ -222,7 +238,7 @@ export function LiquidityWidget() {
                 fontSize: "18px", fontWeight: 600,
                 color: isAdding || isAddConfirming ? "#C3C5CB" : "#fff",
               }}>
-              {isAdding ? "⏳ Confirm..." : isAddConfirming ? "⛓️ Processing..." : "Supply"}
+              {isAdding ? "⏳ Confirm..." : isAddConfirming ? "⛓️ Processing..." : `Supply (${slippage}% slippage)`}
             </button>
           </div>
         </div>
@@ -244,7 +260,7 @@ export function LiquidityWidget() {
               border: "none", cursor: "pointer", fontSize: "18px", fontWeight: 600,
               color: isRemoving || isRemoveConfirming || !lpBalance ? "#C3C5CB" : "#fff",
             }}>
-            {isRemoving ? "⏳ Confirm..." : isRemoveConfirming ? "⛓️ Processing..." : "Remove Liquidity"}
+            {isRemoving ? "⏳ Confirm..." : isRemoveConfirming ? "⛓️ Processing..." : `Remove Liquidity (${slippage}% slippage)`}
           </button>
         </div>
       )}
