@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
           alignItems: "center",
           width: "100%",
           height: "100%",
-          background: "linear-gradient(135deg, #0052FF 0%, #FF007A 100%)",
+          background: "#000000",
           fontFamily: "sans-serif",
         }}
       >
@@ -21,33 +21,41 @@ export async function GET(request: NextRequest) {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          width: "140px",
-          height: "140px",
-          background: "white",
+          width: "160px",
+          height: "160px",
+          background: "#111",
           borderRadius: "32px",
           marginBottom: "40px",
-          boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+          boxShadow: "0 8px 32px rgba(255,255,255,0.1)",
+          border: "2px solid #333",
         }}>
-          <span style={{ fontSize: "80px", fontWeight: 900, color: "#0052FF" }}>V2</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="https://airdrop-olive.vercel.app/icon.png"
+            width={120}
+            height={120}
+            style={{ borderRadius: "20px" }}
+          />
         </div>
 
         {/* Title */}
         <h1 style={{
-          fontSize: "96px",
+          fontSize: "120px",
           fontWeight: 900,
           color: "white",
           margin: "0 0 16px 0",
-          letterSpacing: "-2px",
+          letterSpacing: "12px",
         }}>
-          UniSwap V2
+          CLAN
         </h1>
 
         {/* Subtitle */}
         <p style={{
           fontSize: "48px",
-          color: "rgba(255,255,255,0.85)",
-          margin: "0 0 40px 0",
-          fontWeight: 500,
+          color: "rgba(255,255,255,0.6)",
+          margin: "0 0 48px 0",
+          fontWeight: 400,
+          letterSpacing: "2px",
         }}>
           Swap tokens. Anywhere.
         </p>
@@ -57,16 +65,15 @@ export async function GET(request: NextRequest) {
           display: "flex",
           alignItems: "center",
           gap: "12px",
-          background: "rgba(255,255,255,0.2)",
+          background: "rgba(0,82,255,0.2)",
           borderRadius: "100px",
           padding: "12px 32px",
-          border: "2px solid rgba(255,255,255,0.4)",
+          border: "2px solid #0052FF",
         }}>
           <div style={{
             width: "32px", height: "32px",
             background: "#0052FF",
             borderRadius: "50%",
-            border: "2px solid white",
           }} />
           <span style={{ fontSize: "36px", color: "white", fontWeight: 700 }}>
             Built on Base
