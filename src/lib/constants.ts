@@ -38,6 +38,7 @@ export interface Token {
 }
 export const BASE_TOKENS: Token[] = [
   { symbol: 'ETH',   name: 'Ethereum',            address: '0x4200000000000000000000000000000000000006', decimals: 18, logoColor: '#627EEA', logoText: '⟠', isNative: true },
+  { symbol: 'CLAN',  name: 'Clan',                address: '0x7f05783BAeC7193d10A2687AB372A64AB6C30B07', decimals: 18, logoColor: '#222222', logoText: '🐉' },
   { symbol: 'USDC',  name: 'USD Coin',             address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', decimals: 6,  logoColor: '#2775CA', logoText: '$' },
   { symbol: 'DAI',   name: 'Dai Stablecoin',       address: '0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb', decimals: 18, logoColor: '#F5A623', logoText: '◈' },
   { symbol: 'WETH',  name: 'Wrapped Ether',        address: '0x4200000000000000000000000000000000000006', decimals: 18, logoColor: '#627EEA', logoText: 'W' },

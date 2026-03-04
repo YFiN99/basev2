@@ -4,6 +4,7 @@ import { Token } from '~/lib/constants';
 // Token list dari Base yang sudah diverifikasi (fallback)
 const STATIC_BASE_TOKENS: Token[] = [
   { symbol: 'ETH',    name: 'Ethereum',            address: '0x4200000000000000000000000000000000000006', decimals: 18, logoColor: '#627EEA', logoText: '⟠', isNative: true },
+  { symbol: 'CLAN',   name: 'Clan',                address: '0x7f05783BAeC7193d10A2687AB372A64AB6C30B07', decimals: 18, logoColor: '#222222', logoText: '🐉' },
   { symbol: 'USDC',   name: 'USD Coin',             address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', decimals: 6,  logoColor: '#2775CA', logoText: '$' },
   { symbol: 'WETH',   name: 'Wrapped Ether',        address: '0x4200000000000000000000000000000000000006', decimals: 18, logoColor: '#627EEA', logoText: 'W' },
   { symbol: 'DAI',    name: 'Dai Stablecoin',       address: '0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb', decimals: 18, logoColor: '#F5A623', logoText: '◈' },
@@ -18,6 +19,11 @@ const STATIC_BASE_TOKENS: Token[] = [
   { symbol: 'MORPHO', name: 'Morpho',               address: '0xBAa5CC21fd487B8Fcc2F632f8F4e3f4dc4a5D5f2', decimals: 18, logoColor: '#00C2FF', logoText: 'M' },
   { symbol: 'SNX',    name: 'Synthetix',            address: '0x22e6966B799c4D5B13BE962E1D117b56327FDa66', decimals: 18, logoColor: '#00D1FF', logoText: 'S' },
   { symbol: 'PRIME',  name: 'Echelon Prime',        address: '0xfA980cEd6895AC314E7dE34Ef1bFAE90a5AdD21', decimals: 18, logoColor: '#FFD700', logoText: 'P' },
+];
+
+// Token yang wajib selalu ada (pinned), tidak tergantikan oleh CoinGecko
+const PINNED_TOKENS: Token[] = [
+  { symbol: 'CLAN', name: 'Clan', address: '0x7f05783BAeC7193d10A2687AB372A64AB6C30B07', decimals: 18, logoColor: '#222222', logoText: '🐉' },
 ];
 
 // Ambil warna dari symbol
@@ -37,14 +43,13 @@ async function fetchBaseTokens(): Promise<Token[]> {
   try {
     const res = await fetch(
       'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&category=base-ecosystem&order=market_cap_desc&per_page=100&page=1&sparkline=false',
-      { next: { revalidate: 3600 } } // cache 1 jam
+      { next: { revalidate: 3600 } }
     );
     if (!res.ok) throw new Error('CoinGecko fetch failed');
     const data = await res.json();
 
     const tokens: Token[] = [];
     for (const coin of data) {
-      // Ambil contract address di Base (chain id 8453)
       const detailRes = await fetch(
         `https://api.coingecko.com/api/v3/coins/${coin.id}?localization=false&tickers=false&market_data=false&community_data=false&developer_data=false`,
         { next: { revalidate: 3600 } }
@@ -63,10 +68,17 @@ async function fetchBaseTokens(): Promise<Token[]> {
         logoText: coin.symbol.slice(0, 2).toUpperCase(),
       });
 
-      if (tokens.length >= 50) break; // max 50 token
+      if (tokens.length >= 50) break;
     }
 
-    return tokens.length > 0 ? tokens : STATIC_BASE_TOKENS;
+    if (tokens.length > 0) {
+      // Gabung: pinned tokens di atas, lalu hasil CoinGecko (tanpa duplikat)
+      const pinnedSymbols = new Set(PINNED_TOKENS.map(t => t.symbol));
+      const filtered = tokens.filter(t => !pinnedSymbols.has(t.symbol));
+      return [...PINNED_TOKENS, ...filtered];
+    }
+
+    return STATIC_BASE_TOKENS;
   } catch (e) {
     console.error('Failed to fetch token list, using static list:', e);
     return STATIC_BASE_TOKENS;
@@ -79,7 +91,6 @@ export function useTokenList() {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    // Cek cache di sessionStorage dulu
     const cached = sessionStorage.getItem('base_token_list');
     const cachedTime = sessionStorage.getItem('base_token_list_time');
     const ONE_HOUR = 60 * 60 * 1000;
@@ -89,7 +100,6 @@ export function useTokenList() {
       return;
     }
 
-    // Fetch fresh
     setIsLoading(true);
     fetchBaseTokens().then((list) => {
       setTokens(list);
