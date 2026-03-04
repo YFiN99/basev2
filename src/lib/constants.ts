@@ -1,13 +1,13 @@
 import { type AccountAssociation } from '@farcaster/miniapp-core/src/manifest';
 export const APP_URL: string = process.env.NEXT_PUBLIC_URL!;
-export const APP_NAME: string = 'uniswapv2';
-export const APP_DESCRIPTION: string = 'Uniswap V2 on Base';
+export const APP_NAME: string = 'CLAN';
+export const APP_DESCRIPTION: string = 'CLAN - Swap on Base';
 export const APP_PRIMARY_CATEGORY: string = 'Finance';
-export const APP_TAGS: string[] = ['defi', 'swap', 'uniswap', 'base'];
+export const APP_TAGS: string[] = ['defi', 'swap', 'clan', 'base'];
 export const APP_ICON_URL: string = `${APP_URL}/icon.png`;
 export const APP_OG_IMAGE_URL: string = `${APP_URL}/api/opengraph-image`;
 export const APP_SPLASH_URL: string = `${APP_URL}/splash.png`;
-export const APP_SPLASH_BACKGROUND_COLOR: string = '#F7F8FA';
+export const APP_SPLASH_BACKGROUND_COLOR: string = '#000000';
 export const APP_ACCOUNT_ASSOCIATION: AccountAssociation = {
   header: "eyJmaWQiOjM4NjUwMSwidHlwZSI6ImF1dGgiLCJrZXkiOiIweDIzRjM5MTBDNjVjNWYzMjY5M0ZlRDlmMTM4MzM1ZDlCMURkQmE3NDEifQ",
   payload: "eyJkb21haW4iOiJhaXJkcm9wLW9saXZlLnZlcmNlbC5hcHAifQ",
