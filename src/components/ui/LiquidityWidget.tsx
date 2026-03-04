@@ -69,15 +69,14 @@ function TokenModal({ onSelect, onClose, exclude }: {
   );
 }
 
-// Slippage options
 const SLIPPAGE_OPTIONS = [1, 5, 10, 49];
 
 export function LiquidityWidget() {
   const [mode, setMode] = useState<"add" | "remove">("add");
-  const [slippage, setSlippage] = useState(5); // default 5%
+  const [slippage, setSlippage] = useState(5);
 
-  const [tokenA, setTokenA] = useState<Token>(BASE_TOKENS[0]); // ETH default
-  const [tokenB, setTokenB] = useState<Token>(BASE_TOKENS[1]); // USDC default
+  const [tokenA, setTokenA] = useState<Token>(BASE_TOKENS[0]);
+  const [tokenB, setTokenB] = useState<Token>(BASE_TOKENS[1]);
 
   const [amountA, setAmountA] = useState("");
   const [amountB, setAmountB] = useState("");
@@ -96,6 +95,24 @@ export function LiquidityWidget() {
 
   const { formatted: balanceA } = useTokenBalance(tokenA, address);
   const { formatted: balanceB } = useTokenBalance(tokenB, address);
+
+  // Auto-calculate token B saat user input token A
+  const handleAmountAChange = (val: string) => {
+    setAmountA(val);
+    if (isValidPair && val && Number(reserve0) > 0 && Number(reserve1) > 0) {
+      const ratio = Number(reserve1) / Number(reserve0);
+      setAmountB((Number(val) * ratio).toFixed(tokenB.decimals > 6 ? 6 : tokenB.decimals));
+    }
+  };
+
+  // Auto-calculate token A saat user input token B
+  const handleAmountBChange = (val: string) => {
+    setAmountB(val);
+    if (isValidPair && val && Number(reserve0) > 0 && Number(reserve1) > 0) {
+      const ratio = Number(reserve0) / Number(reserve1);
+      setAmountA((Number(val) * ratio).toFixed(6));
+    }
+  };
 
   const handleAdd = async () => {
     if (!address) return;
@@ -190,6 +207,14 @@ export function LiquidityWidget() {
         </div>
       )}
 
+      {/* New pool notice */}
+      {!isValidPair && mode === "add" && (
+        <div style={{ background: "#FFF8E1", borderRadius: "16px", padding: "12px 16px", marginBottom: "12px", border: "1px solid #FFE082" }}>
+          <div style={{ fontSize: "13px", color: "#F57F17", fontWeight: 600 }}>⚠️ Pool Baru</div>
+          <div style={{ fontSize: "12px", color: "#F57F17", marginTop: "4px" }}>Pair ini belum ada. Input bebas — kamu yang menentukan harga awal pool.</div>
+        </div>
+      )}
+
       {mode === "add" ? (
         <div style={{ background: "#fff", borderRadius: "24px", padding: "4px", boxShadow: "0 4px 24px rgba(0,0,0,0.08)", border: "1px solid #E8ECEF" }}>
 
@@ -199,12 +224,17 @@ export function LiquidityWidget() {
               <span style={{ fontSize: "13px", color: "#888" }}>{tokenA.symbol} Amount</span>
               <span style={{ fontSize: "12px", color: "#888" }}>
                 Balance: <span style={{ color: "#000", fontWeight: 500, cursor: "pointer", textDecoration: "underline" }}
-                  onClick={() => setAmountA(balanceA)}>{balanceA}</span>
+                  onClick={() => handleAmountAChange(balanceA)}>{balanceA}</span>
               </span>
             </div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <input type="number" value={amountA} placeholder="0.0" onChange={(e) => setAmountA(e.target.value)}
-                style={{ background: "none", border: "none", outline: "none", fontSize: "32px", fontWeight: 500, width: "55%", color: amountA ? "#000" : "#C3C5CB" }} />
+              <input
+                type="number"
+                value={amountA}
+                placeholder="0.0"
+                onChange={(e) => handleAmountAChange(e.target.value)}
+                style={{ background: "none", border: "none", outline: "none", fontSize: "32px", fontWeight: 500, width: "55%", color: amountA ? "#000" : "#C3C5CB" }}
+              />
               <TokenButton token={tokenA} onClick={() => setShowModalA(true)} />
             </div>
           </div>
@@ -219,15 +249,30 @@ export function LiquidityWidget() {
               <span style={{ fontSize: "13px", color: "#888" }}>{tokenB.symbol} Amount</span>
               <span style={{ fontSize: "12px", color: "#888" }}>
                 Balance: <span style={{ color: "#000", fontWeight: 500, cursor: "pointer", textDecoration: "underline" }}
-                  onClick={() => setAmountB(balanceB)}>{balanceB}</span>
+                  onClick={() => handleAmountBChange(balanceB)}>{balanceB}</span>
               </span>
             </div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <input type="number" value={amountB} placeholder="0.0" onChange={(e) => setAmountB(e.target.value)}
-                style={{ background: "none", border: "none", outline: "none", fontSize: "32px", fontWeight: 500, width: "55%", color: amountB ? "#000" : "#C3C5CB" }} />
+              <input
+                type="number"
+                value={amountB}
+                placeholder={isValidPair ? "Auto" : "0.0"}
+                onChange={(e) => handleAmountBChange(e.target.value)}
+                style={{ background: "none", border: "none", outline: "none", fontSize: "32px", fontWeight: 500, width: "55%", color: amountB ? "#000" : "#C3C5CB" }}
+              />
               <TokenButton token={tokenB} onClick={() => setShowModalB(true)} />
             </div>
           </div>
+
+          {/* Rate info */}
+          {isValidPair && amountA && amountB && (
+            <div style={{ padding: "8px 16px", display: "flex", justifyContent: "space-between" }}>
+              <span style={{ fontSize: "12px", color: "#888" }}>Rate</span>
+              <span style={{ fontSize: "12px", color: "#888" }}>
+                1 {tokenA.symbol} = {(Number(amountB) / Number(amountA)).toFixed(4)} {tokenB.symbol}
+              </span>
+            </div>
+          )}
 
           <div style={{ padding: "4px" }}>
             <button onClick={handleAdd} disabled={isAdding || isAddConfirming || !amountA || !amountB}
@@ -243,7 +288,6 @@ export function LiquidityWidget() {
           </div>
         </div>
       ) : (
-        /* REMOVE */
         <div style={{ background: "#fff", borderRadius: "24px", padding: "16px", boxShadow: "0 4px 24px rgba(0,0,0,0.08)", border: "1px solid #E8ECEF" }}>
           <div style={{ fontSize: "13px", color: "#888", marginBottom: "8px" }}>Your LP Balance</div>
           <div style={{ fontSize: "28px", fontWeight: 700, marginBottom: "16px", color: "#FF007A" }}>{lpFormatted} LP</div>
@@ -284,7 +328,7 @@ export function LiquidityWidget() {
       {/* Modal Token A */}
       {showModalA && (
         <TokenModal
-          onSelect={(t) => { setTokenA(t); setShowModalA(false); }}
+          onSelect={(t) => { setTokenA(t); setAmountA(""); setAmountB(""); setShowModalA(false); }}
           onClose={() => setShowModalA(false)}
           exclude={tokenB}
         />
@@ -293,7 +337,7 @@ export function LiquidityWidget() {
       {/* Modal Token B */}
       {showModalB && (
         <TokenModal
-          onSelect={(t) => { setTokenB(t); setShowModalB(false); }}
+          onSelect={(t) => { setTokenB(t); setAmountA(""); setAmountB(""); setShowModalB(false); }}
           onClose={() => setShowModalB(false)}
           exclude={tokenA}
         />
