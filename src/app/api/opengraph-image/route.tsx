@@ -1,25 +1,77 @@
 import { ImageResponse } from "next/og";
 import { NextRequest } from "next/server";
-import { getNeynarUser } from "~/lib/neynar";
-
 export const dynamic = 'force-dynamic';
-
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const fid = searchParams.get('fid');
-
-  const user = fid ? await getNeynarUser(Number(fid)) : null;
-
   return new ImageResponse(
     (
-      <div tw="flex h-full w-full flex-col justify-center items-center relative bg-primary">
-        {user?.pfp_url && (
-          <div tw="flex w-96 h-96 rounded-full overflow-hidden mb-8 border-8 border-white">
-            <img src={user.pfp_url} alt="Profile" tw="w-full h-full object-cover" />
-          </div>
-        )}
-        <h1 tw="text-8xl text-white">{user?.display_name ? `Hello from ${user.display_name ?? user.username}!` : 'Hello!'}</h1>
-        <p tw="text-5xl mt-4 text-white opacity-80">Powered by Neynar 🪐</p>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          alignItems: "center",
+          width: "100%",
+          height: "100%",
+          background: "linear-gradient(135deg, #0052FF 0%, #FF007A 100%)",
+          fontFamily: "sans-serif",
+        }}
+      >
+        {/* Logo */}
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: "140px",
+          height: "140px",
+          background: "white",
+          borderRadius: "32px",
+          marginBottom: "40px",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+        }}>
+          <span style={{ fontSize: "80px", fontWeight: 900, color: "#0052FF" }}>V2</span>
+        </div>
+
+        {/* Title */}
+        <h1 style={{
+          fontSize: "96px",
+          fontWeight: 900,
+          color: "white",
+          margin: "0 0 16px 0",
+          letterSpacing: "-2px",
+        }}>
+          UniSwap V2
+        </h1>
+
+        {/* Subtitle */}
+        <p style={{
+          fontSize: "48px",
+          color: "rgba(255,255,255,0.85)",
+          margin: "0 0 40px 0",
+          fontWeight: 500,
+        }}>
+          Swap tokens. Anywhere.
+        </p>
+
+        {/* Base badge */}
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "12px",
+          background: "rgba(255,255,255,0.2)",
+          borderRadius: "100px",
+          padding: "12px 32px",
+          border: "2px solid rgba(255,255,255,0.4)",
+        }}>
+          <div style={{
+            width: "32px", height: "32px",
+            background: "#0052FF",
+            borderRadius: "50%",
+            border: "2px solid white",
+          }} />
+          <span style={{ fontSize: "36px", color: "white", fontWeight: 700 }}>
+            Built on Base
+          </span>
+        </div>
       </div>
     ),
     {
