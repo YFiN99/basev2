@@ -42,10 +42,10 @@ export default function App({ title }: AppProps = {}) {
     return (
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "center",
-        height: "100vh", background: "#F7F8FA",
+        height: "100vh", background: "#000",
       }}>
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: "48px", marginBottom: "12px" }}>🦄</div>
+          <img src="/icon.png" width={64} height={64} style={{ borderRadius: "16px", marginBottom: "12px" }} />
           <p style={{ color: "#888", fontSize: "14px" }}>Loading...</p>
         </div>
       </div>
@@ -59,16 +59,15 @@ export default function App({ title }: AppProps = {}) {
       paddingLeft:   context?.client.safeAreaInsets?.left   ?? 0,
       paddingRight:  context?.client.safeAreaInsets?.right  ?? 0,
     }}>
-
       {/* Header */}
       <div style={{
         display: "flex", alignItems: "center", gap: "10px",
-        padding: "12px 16px", background: "#fff",
-        borderBottom: "1px solid #E8ECEF",
+        padding: "12px 16px", background: "#000",
+        borderBottom: "1px solid #222",
         position: "sticky", top: 0, zIndex: 40,
       }}>
         <img src="/icon.png" width={28} height={28} style={{ borderRadius: "8px" }} />
-        <span style={{ fontWeight: 700, fontSize: "16px", color: "#000" }}>UniswapV2</span>
+        <span style={{ fontWeight: 700, fontSize: "16px", color: "#fff", letterSpacing: "2px" }}>CLAN</span>
         <span style={{
           marginLeft: "auto", fontSize: "11px",
           background: "#0052FF", color: "#fff",
